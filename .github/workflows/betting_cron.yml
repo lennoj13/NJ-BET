@@ -1,0 +1,46 @@
+name: Ejecutar Scripts de Apuestas
+
+on:
+  schedule:
+    # Ejecutar todos los días a las 08:00 UTC (Ajusta según tu zona horaria)
+    - cron: '0 8 * * *'
+  workflow_dispatch: # Permite ejecutar manualmente desde la pestaña Actions
+
+jobs:
+  run-scripts:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout del código
+      uses: actions/checkout@v4
+
+    - name: Configurar Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+
+    - name: Instalar dependencias
+      run: npm ci
+
+    - name: Ejecutar Generador Diario
+      env:
+        VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+        SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+        TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+      run: node scripts/generador_diario.js
+
+    - name: Ejecutar Francotirador (Opcional)
+      # Descomenta la siguiente línea si quieres que también se ejecute automáticamente
+      # if: always() 
+      env:
+        VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+        SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+        TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+      run: node scripts/francotirador.js
