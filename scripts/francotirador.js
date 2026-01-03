@@ -22,27 +22,51 @@ if (!SUPABASE_URL || !SUPABASE_KEY || !GROQ_API_KEY || !TAVILY_API_KEY || !ODDS_
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const groq = new Groq({ apiKey: GROQ_API_KEY });
 
-// Ligas VIP para consultar scores (Mismas que en generador)
-const LIGAS_VIP = [
-  { key: 'soccer_uefa_champs_league', label: 'Champions League' },
-  { key: 'soccer_epl', label: 'Premier League' },
-  { key: 'soccer_spain_la_liga', label: 'La Liga' },
-  { key: 'soccer_italy_serie_a', label: 'Serie A' },
-  { key: 'soccer_germany_bundesliga', label: 'Bundesliga' },
-  { key: 'basketball_nba', label: 'NBA' }
-];
+// Mapa de nombres de DB a Keys de API (The Odds API)
+const MAPA_LIGAS = {
+  'Premier League': 'soccer_epl',
+  'La Liga': 'soccer_spain_la_liga',
+  'Serie A': 'soccer_italy_serie_a',
+  'Bundesliga': 'soccer_germany_bundesliga',
+  'Ligue 1': 'soccer_france_ligue_one',
+  'Champions League': 'soccer_uefa_champs_league',
+  'NBA': 'basketball_nba',
+  'NFL': 'americanfootball_nfl',
+  'MLB': 'baseball_mlb',
+  'NHL': 'icehockey_nhl',
+  'Eredivisie': 'soccer_netherlands_eredivisie',
+  'Primeira Liga': 'soccer_portugal_primeira_liga'
+};
 
 /**
- * Helper: Obtener Scores Oficiales de The Odds API
+ * Helper: Obtener Scores Oficiales de The Odds API (Dinámico)
  */
-async function obtenerScoresOficiales() {
+async function obtenerScoresOficiales(tickets) {
   console.log('📡 Consultando resultados oficiales en The Odds API...');
-  let scoresMap = {}; // Mapa: "TeamA vs TeamB" -> "100-98"
+  let scoresMap = {}; 
 
-  for (const liga of LIGAS_VIP) {
+  // 1. Extraer ligas únicas de los tickets pendientes
+  const ligasRaw = new Set();
+  tickets.forEach(t => {
+    t.partidos.forEach(p => {
+      if (p.deporte) ligasRaw.add(p.deporte);
+    });
+  });
+
+  // 2. Mapear a keys de API
+  const keysApi = [...new Set([...ligasRaw].map(nombre => MAPA_LIGAS[nombre] || nombre))];
+  
+  if (keysApi.length === 0) {
+    console.log('   ⚠️ No se detectaron ligas conocidas en los tickets.');
+    return {};
+  }
+
+  console.log(`   🎯 Ligas a consultar: ${keysApi.join(', ')}`);
+
+  for (const ligaKey of keysApi) {
     try {
       // Pedimos scores de los últimos 3 días
-      const response = await axios.get(`https://api.the-odds-api.com/v4/sports/${liga.key}/scores`, {
+      const response = await axios.get(`https://api.the-odds-api.com/v4/sports/${ligaKey}/scores`, {
         params: {
           apiKey: ODDS_API_KEY,
           daysFrom: 3,
@@ -51,30 +75,22 @@ async function obtenerScoresOficiales() {
       });
 
       response.data.forEach(game => {
-        if (game.completed) {
-          // Normalizamos nombres para facilitar búsqueda
-          const key = `${game.home_team} vs ${game.away_team}`;
+        // Guardamos info del partido, esté terminado o no (para tener contexto)
+        const key = `${game.home_team} vs ${game.away_team}`;
+        
+        if (game.scores || !game.completed) {
+          const homeScore = game.scores?.find(s => s.name === game.home_team)?.score || 0;
+          const awayScore = game.scores?.find(s => s.name === game.away_team)?.score || 0;
           
-          // Extraer score. Formato API: scores: [{name: "TeamA", score: "10"}, {name: "TeamB", score: "5"}]
-          // A veces scores es null si cancelado
-          if (game.scores) {
-            const homeScore = game.scores.find(s => s.name === game.home_team)?.score;
-            const awayScore = game.scores.find(s => s.name === game.away_team)?.score;
-            
-            if (homeScore !== undefined && awayScore !== undefined) {
-              scoresMap[key] = {
-                marcador: `${homeScore}-${awayScore}`,
-                estado: 'Finalizado',
-                ganador: parseInt(homeScore) > parseInt(awayScore) ? game.home_team : (parseInt(awayScore) > parseInt(homeScore) ? game.away_team : 'Empate')
-              };
-            }
-          } else {
-             scoresMap[key] = { marcador: 'Cancelado/Postpuesto', estado: 'VOID' };
-          }
+          scoresMap[key] = {
+            marcador: `${homeScore}-${awayScore}`,
+            estado: game.completed ? 'Finalizado' : 'En Juego/Pendiente',
+            ganador: parseInt(homeScore) > parseInt(awayScore) ? game.home_team : (parseInt(awayScore) > parseInt(homeScore) ? game.away_team : 'Empate')
+          };
         }
       });
     } catch (error) {
-      console.warn(`   ⚠️ Error obteniendo scores de ${liga.label}:`, error.message);
+      console.warn(`   ⚠️ Error obteniendo scores de ${ligaKey}:`, error.message);
     }
   }
   
@@ -306,15 +322,16 @@ async function actualizarBaseDeDatos(ticket, resultadoIA) {
 
 async function main() {
   try {
-    // 0. Cargar Scores Oficiales (Una sola vez para todos los tickets)
-    const scoresOficiales = await obtenerScoresOficiales();
-
+    // 1. Obtener Tickets PRIMERO para saber qué ligas consultar
     const tickets = await obtenerTicketsPendientes();
     
     if (tickets.length === 0) {
       console.log('😴 No hay tickets pendientes para verificar.');
       return;
     }
+
+    // 2. Cargar Scores Oficiales (Basado en los tickets encontrados)
+    const scoresOficiales = await obtenerScoresOficiales(tickets);
 
     for (const ticket of tickets) {
       // Pausa pequeña
