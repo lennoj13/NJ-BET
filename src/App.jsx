@@ -52,13 +52,22 @@ function App() {
   const fetchDailyPicks = async () => {
     try {
       setLoadingPicks(true);
-      const today = new Date().toISOString().split('T')[0];
+      
+      // Lógica de Fecha de Apuestas:
+      // Si es antes de las 6:00 AM, mostramos los tickets del día anterior.
+      // Esto evita que la pantalla quede vacía en la madrugada antes de que corra el script.
+      const now = new Date();
+      if (now.getHours() < 6) {
+        now.setDate(now.getDate() - 1);
+      }
+      // Usamos toLocaleDateString('en-CA') para obtener YYYY-MM-DD en hora local
+      const bettingDate = now.toLocaleDateString('en-CA');
       
       // Nueva consulta relacional: tickets + partidos
       const { data, error } = await supabase
         .from('tickets')
         .select('*, partidos(*)')
-        .eq('fecha', today)
+        .eq('fecha', bettingDate)
         .order('id', { ascending: true });
 
       if (error) throw error;
@@ -75,10 +84,10 @@ function App() {
       
       {/* Background Gradients for Liquid Effect */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
-        {/* Light Mode Blobs - Active Liquid Flow */}
-        <div className="absolute top-0 left-0 w-[80%] h-[80%] bg-gradient-to-br from-emerald-300/40 via-teal-300/30 to-cyan-300/40 blur-[80px] animate-flow mix-blend-multiply dark:hidden" />
-        <div className="absolute top-0 right-0 w-[80%] h-[80%] bg-gradient-to-bl from-orange-300/40 via-amber-300/30 to-yellow-300/40 blur-[80px] animate-flow animation-delay-2000 mix-blend-multiply dark:hidden" />
-        <div className="absolute -bottom-40 left-20 w-[80%] h-[80%] bg-gradient-to-t from-blue-300/40 via-indigo-300/30 to-purple-300/40 blur-[80px] animate-flow animation-delay-4000 mix-blend-multiply dark:hidden" />
+        {/* Light Mode - Static & Optimized for Performance */}
+        <div className="absolute top-[-20%] left-[-20%] w-[70%] h-[70%] rounded-full bg-emerald-300/30 blur-[100px] mix-blend-multiply dark:hidden" />
+        <div className="absolute top-[-20%] right-[-20%] w-[70%] h-[70%] rounded-full bg-teal-200/40 blur-[100px] mix-blend-multiply dark:hidden" />
+        <div className="absolute bottom-[-20%] left-[20%] w-[70%] h-[70%] rounded-full bg-cyan-200/30 blur-[100px] mix-blend-multiply dark:hidden" />
 
         {/* Dark Mode Blobs */}
         <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-brand-500/20 blur-[120px] animate-pulse hidden dark:block" />
@@ -93,7 +102,7 @@ function App() {
         toggleTheme={toggleTheme}
       />
 
-      <main className="relative max-w-6xl mx-auto px-4 py-8 space-y-12 z-10">
+      <main className="relative max-w-6xl mx-auto px-4 pt-28 pb-8 space-y-12 z-10">
         
         {currentView === 'home' ? (
           <>

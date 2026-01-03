@@ -1,18 +1,42 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrainCircuit, Calendar, Home, Sun, Moon } from 'lucide-react';
 
 const Header = ({ currentView, setCurrentView, darkMode, toggleTheme }) => {
+  const [isVisible, setIsVisible] = useState(true);
+  const [lastScrollY, setLastScrollY] = useState(0);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      
+      // Show header if scrolling up or at the top
+      if (currentScrollY < lastScrollY || currentScrollY < 50) {
+        setIsVisible(true);
+      } else if (currentScrollY > lastScrollY && currentScrollY > 80) {
+        // Hide header if scrolling down and past the header height
+        setIsVisible(false);
+      }
+      
+      setLastScrollY(currentScrollY);
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [lastScrollY]);
+
   return (
-    <header className={`w-full py-3 px-4 sticky top-0 z-50 border-b shadow-lg h-[80px] flex items-center transition-all duration-300 ${
+    <header className={`w-full py-3 px-4 fixed top-0 z-50 border-b shadow-lg h-[80px] flex items-center transition-transform duration-300 transform-gpu ${
+      isVisible ? 'translate-y-0' : '-translate-y-full'
+    } ${
       darkMode 
         ? 'border-slate-800 bg-slate-900/95 backdrop-blur-md' 
-        : 'border-white/20 bg-[#07c707ad] shadow-lg shadow-brand-500/20'
+        : 'border-white/20 bg-[#07c707ad] backdrop-blur-md shadow-lg shadow-brand-500/20'
     }`}>
       <div className="max-w-6xl mx-auto flex items-center justify-between w-full">
         
         {/* Logo Container - Unified Dimensions */}
         <div 
-          className={`flex items-center gap-3 cursor-pointer group py-2 px-4 rounded-full transition-all duration-300 hover:scale-105 ${
+          className={`flex items-center gap-2 md:gap-3 cursor-pointer group py-2 px-3 md:px-4 rounded-full transition-all duration-300 hover:scale-105 ${
             darkMode 
               ? 'border border-transparent' 
               : 'bg-white/30 backdrop-blur-md shadow-lg border border-white/40'
@@ -39,7 +63,7 @@ const Header = ({ currentView, setCurrentView, darkMode, toggleTheme }) => {
           </div>
         </div>
         
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 md:gap-4">
           {/* Navigation - Unified Sliding Pill */}
           <nav className={`relative flex items-center p-1 rounded-full backdrop-blur-sm border ${
             darkMode 
@@ -59,24 +83,24 @@ const Header = ({ currentView, setCurrentView, darkMode, toggleTheme }) => {
             
             <button 
               onClick={() => setCurrentView('home')}
-              className={`relative z-10 flex items-center justify-center gap-2 px-4 py-2 rounded-full text-sm font-bold transition-colors duration-300 w-28 ${
+              className={`relative z-10 flex items-center justify-center gap-2 px-3 py-2 rounded-full text-sm font-bold transition-colors duration-300 w-12 md:w-28 ${
                 currentView === 'home' 
                   ? (darkMode ? 'text-white' : 'text-brand-600') 
                   : (darkMode ? 'text-slate-400 hover:text-white' : 'text-slate-800 hover:text-brand-700')
               }`}
             >
-              <Home className="w-4 h-4" />
+              <Home className="w-5 h-5 md:w-4 md:h-4" />
               <span className="hidden md:inline">Inicio</span>
             </button>
             <button 
               onClick={() => setCurrentView('history')}
-              className={`relative z-10 flex items-center justify-center gap-2 px-4 py-2 rounded-full text-sm font-bold transition-colors duration-300 w-28 ${
+              className={`relative z-10 flex items-center justify-center gap-2 px-3 py-2 rounded-full text-sm font-bold transition-colors duration-300 w-12 md:w-28 ${
                 currentView === 'history' 
                   ? (darkMode ? 'text-white' : 'text-brand-600') 
                   : (darkMode ? 'text-slate-400 hover:text-white' : 'text-slate-800 hover:text-brand-700')
               }`}
             >
-              <Calendar className="w-4 h-4" />
+              <Calendar className="w-5 h-5 md:w-4 md:h-4" />
               <span className="hidden md:inline">Historial</span>
             </button>
           </nav>
